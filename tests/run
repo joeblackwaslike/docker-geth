@@ -7,7 +7,7 @@ if [[ $1 == 'local' ]]; then
     pip3 install --upgrade testdocker > /dev/null 2>&1
     python3 $base/tests.py
 else
-    image=${DOCKER_ORG:=callforamerica}/testdocker
+    image=callforamerica/testdocker
     docker pull $image
     docker run -it --rm \
         $([[ -f $base/vars.env ]] && echo '--env-file vars.env') \
