@@ -1,0 +1,76 @@
+#!/bin/bash -l
+
+set -e
+
+[[ $DEBUG == true ]] && set -x
+
+[[ -f /etc/entrypoint ]] && . /etc/entrypoint
+
+: readonly ${GETH_CONFIG:=$HOME/.ethereum.toml}
+: readonly ${GETH_SYNC_MODE:=fast} # {fast,full,light}
+: readonly ${GETH_CACHE:=512}     # (min 16MB / 512-2048 suggested (default: 128)
+
+# 0: silent  1: error  2: warn  3: info4: core  5: debug  6: detail (default: 3)
+: readonly ${GETH_VERBOSITY:=3}
+: readonly ${GETH_WHISPER:=false}
+
+: readonly ${GETH_RPC:=true}
+: readonly ${GETH_RPC_ADDR:=0.0.0.0}
+: readonly ${GETH_RPC_PORT:=8545}
+: readonly ${GETH_RPC_CORS:='*'}
+: readonly ${GETH_PORT:=30303}
+
+: readonly ${GETH_MINE:=false}
+
+: readonly ${GETH_MAX_PEERS:=25}
+: readonly ${GETH_NO_DISCOVERY:=false}
+
+
+# to get a config file:
+#   geth --your-favourite-flags dumpconfig
+log::m-info "Writing config ..."
+tee $GETH_CONFIG <<EOF
+[Eth]
+NetworkId = $NETWORK_ID
+SyncMode = "$GETH_SYNC_MODE"
+DatabaseCache = $GETH_CACHE
+
+[Node]
+IPCPath = "$HOME/.ethereum/geth.ipc"
+HTTPHost = "$GETH_RPC_ADDR"
+HTTPPort = $GETH_RPC_PORT
+HTTPCors = ["$GETH_RPC_CORS"]
+HTTPModules = ["net", "web3", "eth", "shh"]
+WSPort = 8546
+WSModules = ["net", "web3", "eth", "shh"]
+
+[Node.P2P]
+MaxPeers = 25
+NoDiscovery = false
+DiscoveryV5Addr = ":30304"
+$(if [[ ! -z $BOOT_NODE ]]; then echo "BootstrapNodes = [\"$BOOT_NODE\"]"; fi)
+StaticNodes = []
+TrustedNodes = []
+ListenAddr = ":$GETH_PORT"
+EOF
+
+
+if [[ $(geth-helper number-of-accounts) == 0 ]]; then
+    log::m-info "No account, creating default account ..."
+    geth-helper create-default-account "$DEFAULT_ACCOUNT_PASS"
+fi
+
+
+log::m-info "Building arguments ..."
+args=()
+args+=(--verbosity $GETH_VERBOSITY)
+args+=("$@")
+
+set -- ${args[@]}
+
+
+log::m-info "Starting geth ..."
+[[ $GETH_MINE == true ]] && \
+    geth-helper start-mining &
+
+exec geth "$@"

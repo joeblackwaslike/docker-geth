@@ -1,0 +1,53 @@
+version: '2.1'
+services:
+  geth:
+    container_name: geth
+    hostname: geth.local
+    build:
+      context: .
+      args:
+        GOLANG_VERSION: 1.8.3
+        SOLC_VERSION: v0.4.13
+    image: telephoneorg/geth:${TAG:-latest}
+    env_file:
+    - default.env
+    - secrets.env
+    ports:
+    - "8545:8545"
+    - "8546:8546"
+    - "30303:30303"
+    - "30303:30303/udp"
+    - "30304:30304"
+    volumes:
+    - "ethereum:/root/.ethereum"
+    networks:
+      local:
+        aliases:
+        - geth.local
+    restart: on-failure
+  swarm:
+    container_name: swarm
+    hostname: swarm.local
+    image: telephoneorg/geth:${TAG:-latest}
+    env_file:
+    - default.env
+    - secrets.env
+    ports:
+    - "8500:8500"
+    - "30399:30399"
+    - "30399:30399/udp"
+    volumes:
+    - "ethereum:/root/.ethereum"
+    command: swarm
+    networks:
+      local:
+        aliases:
+        - swarm.local
+    depends_on:
+      geth:
+        condition: service_healthy
+    restart: on-failure
+networks:
+  local:
+volumes:
+  ethereum:

@@ -1,0 +1,29 @@
+language: python
+services: docker
+env:
+  global:
+  - DOCKER_USER=joeblackwaslike
+  - DOCKER_ORG=telephoneorg
+  # DOCKER_PASS
+  - secure: "UAG6EhC18EB9/a94g0pLSBYAWAG9fbFUZnXgDLpIclWbtunj+6bO78G5FsaNV1c68fO/UjGkW9eZczD84DkkhPam/0jelHaIfmDT50Po/YRakCloG+L3rzeMPgYWbwfptz62dAuigG5FOd0OFFxPd2h+aww/ctiw2xRfK+m/b3Ys/A/bxsTkrC8CvmGa6X2bUMD+1zn0R+PSD8zyVTLKfNT+aED8z75D+WPhMtIoRxdn8ki3IX3keB8L3Z21dLyPVXDB47gSSIC/daqvW37wZ/zvw0hvUgh1UXYDj/9W2e5JnZ4dM3U2xEPPzGC4bjzy/O4lEZrOo/C4q05NCtO4EKXOIlm4jGG8qssfeyIBG/VE1zyIBIGzyInBNC0QHe2OZusnxXLbSgYREDM7Hva5Rrz9tQCs4zIwU6ci9fGphf6ZXDlDqdeKrbOibs1v6KBGzvhwMT4hnzhqH3MW0kp/b7mS8CXrPBxFI8fn4hLJieXFPoc619LUF6Cnv8h1X6udFtRZRjy4PJlk+6006V0Tidci4AfUG45DSWTgiE8lCg6r7rpj75dYs98AkhUHvLdRS7o40e3+otRo9urTXuF+g4xYzaT2XXiAb4fSz72aHkHy3ncjJ45nQmubmdvGseL3rmRFzDwDPCvE2BYz6P9SW6rTSgclSGHuqZoHhz0GODc="
+notifications:
+  email:
+    on_success: never
+    on_failure: always
+  slack:
+    rooms:
+    - secure: "cminF9/rhqmwuPp+zzaosfXsj7e/kSIzV/tgAYwiNeq11MPgoSdOkukZ8x7lAxqLD/vtiLhrefoV9Xq1hlsFLtfhnjNqOAcTzYUYyg7SHUrIJuqWnfY0ewqQdbblryHLAovhB893X7BLcG/L008gz4qofPX2GOyt8covylPB5NZmbpw5bqSlLNb3l8G8I45v21LFHyl//qV/htkRD4cNjhe1jYwWRaMNKNM5Xj2U9Fmq8bibnaDSYua0OZV6PzumhAJjSEqbBYTjuRYFQKNgzTf9e5k5ZDXlh+wcsLexUE0yCS+qD0kjQLiym7XzDIG8+JfMkVejCgKX12o66ATYGdaodCcW5Wcat7U3PL+KwlssVX7HOhc8c10iEjYMt1oxII/psyjHj9AOEMzHRozJn1GrdszsVBiWEwn7D3ml38x8eNgUHkXIOBKoP09DPRUSwbF/4x0MlD5pNhk8EmK0j/elbrjNaaIPQLnc9jHJmeLSeBmYmsB4Gi/wb9R3CiFPc/rYFZY+j6EfK9Z19i4d63M58rFAwtqs7HtHVqtwZPtra6pM0jxD81iRw3WyEm4TO40ttX1DCSjp3QJFw7nSyQHgozJJnqctzYdFLvRILock7kLo08HOt7ybsnX6gHvS2i/tsYuBBy+7ONQajlJdBFxHykNFoI+0+t0+iLQ0Pss="
+    on_success: always
+    on_failure: always
+
+before_install:
+- pip install --upgrade docker-compose
+- source scripts/ci/environment.sh
+
+install: docker-compose build
+
+script: tests/run
+
+after_success:
+- ci-tag-build
+- hub-push

@@ -1,0 +1,54 @@
+#!/bin/bash -l
+
+
+set -e
+
+[[ $DEBUG == true ]] && set -x
+
+[[ -f /etc/entrypoint ]] && . /etc/entrypoint
+
+
+: readonly ${SWARM_PORT:=30399}
+: readonly ${SWARM_HTTP_ADDR:=0.0.0.0}
+: readonly ${SWARM_HTTP_PORT:=8500}
+
+: readonly ${SWARM_IPC_PATH:=$HOME/.ethereum/bzzd.ipc}
+: readonly ${SWARM_ENS_API:=$HOME/.ethereum/geth.ipc}
+: readonly ${SWARM_CORS:=\'*\'}
+
+# 0: silent  1: error  2: warn  3: info4: core  5: debug  6: detail (default: 3)
+: readonly ${SWARM_VERBOSITY:=3}
+: readonly ${SWARM_BZZ_ACCOUNT_PASS:=$DEFAULT_ACCOUNT_PASS}
+
+SWARM_DATA_DIR=$HOME/.ethereum
+if [[ $NETWORK_ID == 3 ]]; then
+    SWARM_DATA_DIR+=/testnet
+fi
+
+if [[ -z $SWARM_BZZ_ACCOUNT && $(geth-helper number-of-accounts) -gt 0 ]]; then
+    readonly SWARM_BZZ_ACCOUNT=$(geth-helper get-account-by-index 0)
+fi
+
+
+log::m-info "Building arguments ..."
+args=()
+args+=(--bzzaccount $SWARM_BZZ_ACCOUNT)
+args+=(--datadir $SWARM_DATA_DIR)
+args+=(--ipcpath $SWARM_IPC_PATH)
+args+=(--ens-api $SWARM_ENS_API)
+args+=(--port $SWARM_PORT)
+args+=(--httpaddr $SWARM_HTTP_ADDR)
+args+=(--bzzport $SWARM_HTTP_PORT)
+args+=(--verbosity $SWARM_VERBOSITY)
+args+=(--corsdomain $SWARM_CORS)
+
+args+=("$@")
+
+set -- ${args[@]}
+
+[[ $NETWORK_ID == 3 ]] && \
+    geth-helper bootstrap-swarm-enode-bg &
+
+
+log::m-info "Starting swarm ..."
+exec swarm "$@" < <(echo -n "$SWARM_BZZ_ACCOUNT_PASS")

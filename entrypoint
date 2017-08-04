@@ -1,0 +1,30 @@
+#!/bin/bash -l
+
+set -e
+
+[[ $DEBUG == true ]] && set -x
+
+[[ -f /etc/entrypoint ]] && . /etc/entrypoint
+
+
+readonly COMMAND=${1:=geth}
+: readonly ${NETWORK_ID:=3}   # 1: Frontier  2:Morden (disused)  3:Ropsten
+: readonly ${BOOT_NODE:=}    # comma seperated list of enode url's
+
+export NETWORK_ID BOOT_NODE
+
+
+log::m-info "Starting $COMMAND ..."
+case "$COMMAND" in
+    geth)
+        shift
+        exec geth-wrap "$@"
+        ;;
+    swarm)
+        shift
+        exec swarm-wrap "$@"
+        ;;
+    *)
+        exec "$@"
+        ;;
+esac
