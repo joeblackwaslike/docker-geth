@@ -1,12 +1,7 @@
 #!/bin/bash -l
 
-
 set -e
-
 [[ $DEBUG == true ]] && set -x
-
-[[ -f /etc/entrypoint ]] && . /etc/entrypoint
-
 
 : readonly ${SWARM_PORT:=30399}
 : readonly ${SWARM_HTTP_ADDR:=0.0.0.0}
@@ -18,12 +13,17 @@ set -e
 
 # 0: silent  1: error  2: warn  3: info4: core  5: debug  6: detail (default: 3)
 : readonly ${SWARM_VERBOSITY:=3}
-: readonly ${SWARM_BZZ_ACCOUNT_PASS:=$DEFAULT_ACCOUNT_PASS}
+: readonly ${SWARM_BZZ_ACCOUNT_PASS:=testtest}
+: readonly ${SWARM_WAIT_FOR_GETH:=true}
+
 
 SWARM_DATA_DIR=$HOME/.ethereum
 if [[ $NETWORK_ID == 3 ]]; then
     SWARM_DATA_DIR+=/testnet
+elif [[ $NETWORK_ID -gt 3 ]]; then
+    GETH_DATA_DIR+=/private-network-${NETWORK_ID}
 fi
+
 
 if [[ -z $SWARM_BZZ_ACCOUNT && $(geth-helper number-of-accounts) -gt 0 ]]; then
     readonly SWARM_BZZ_ACCOUNT=$(geth-helper get-account-by-index 0)
@@ -41,14 +41,18 @@ args+=(--httpaddr $SWARM_HTTP_ADDR)
 args+=(--bzzport $SWARM_HTTP_PORT)
 args+=(--verbosity $SWARM_VERBOSITY)
 args+=(--corsdomain $SWARM_CORS)
-
 args+=("$@")
-
 set -- ${args[@]}
 
-[[ $NETWORK_ID == 3 ]] && \
-    geth-helper bootstrap-swarm-enode-bg &
+
+if [[ $SWARM_WAIT_FOR_GETH == true && -a /goss/swarm-wait.yaml ]]; then
+    printf 'Waiting for geth ipc .'
+    goss -g /goss/goss_wait-geth.yaml validate --retry-timeout 5m --sleep 5s
+fi
 
 
 log::m-info "Starting swarm ..."
+# If testnet, launch a helper process that will add the first enode
+[[ $NETWORK_ID == 3 ]] && geth-helper bootstrap-swarm-enode &
+
 exec swarm "$@" < <(echo -n "$SWARM_BZZ_ACCOUNT_PASS")

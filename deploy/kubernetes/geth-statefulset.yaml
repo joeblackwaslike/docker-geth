@@ -1,0 +1,39 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: geth
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  serviceName: geth
+  template:
+    metadata:
+      labels:
+        app: geth
+        project: telephoneorg
+        environment: production
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: geth
+        image: joeblackwaslike/geth
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: ethereum
+          mountPath: /root/.ethereum
+        env:
+        - name: GETH_VERBOSITY
+          value: '3'
+        - name: NETWORK_ID
+          value: '3'
+        ports:
+        - containerPort: 8545
+  volumeClaimTemplates:
+  - metadata:
+      name: ethereum
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: 100Gi

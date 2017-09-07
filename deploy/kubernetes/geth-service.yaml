@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: geth
+  labels:
+    app: geth
+    project: telephoneorg
+    environment: production
+spec:
+  ports:
+  - port: 8545
+  - port: 8546
+  clusterIP: None
+  selector:
+    app: drone
+    project: telephoneorg
+    environment: production

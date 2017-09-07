@@ -1,0 +1,4 @@
+command:
+  geth-helper node-is-healthy:
+    exit-status: 0
+    timeout: 10000

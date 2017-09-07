@@ -1,0 +1,4 @@
+command:
+  geth-helper geth-is-running:
+    exit-status: 0
+    timeout: 10000

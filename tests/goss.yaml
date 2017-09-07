@@ -1,0 +1,171 @@
+file:
+  /entrypoint:
+    exists: true
+    mode:
+      or:
+      - "0755"
+      - "0775"
+    size:
+      gt: 1
+    owner: root
+    group: root
+    filetype: file
+  /etc/profile.d/90-eth-common.sh:
+    exists: true
+    mode: "0644"
+    size:
+      gt: 1
+    owner: root
+    group: root
+    filetype: file
+  /goss:
+    exists: true
+    mode: "0777"
+    owner: root
+    group: root
+    filetype: directory
+  /goss/docker_output.log:
+    exists: true
+    mode: "0644"
+    size:
+      gt: 1
+    owner: root
+    group: root
+    filetype: file
+    contains:
+    - Starting peer-to-peer node
+    - UDP listener up
+    - RLPx listener up
+    - IPC endpoint opened
+  /goss/goss.yaml:
+    exists: true
+    mode: "0644"
+    size:
+      gt: 1
+    owner: root
+    group: root
+    filetype: file
+    contains: []
+  /opt/geth/.ethereum:
+    exists: true
+    mode: "0755"
+    owner: geth
+    group: geth
+    filetype: directory
+  /opt/geth/.ethereum/.ethereum.toml:
+    exists: true
+    mode: "0644"
+    size:
+      gt: 1
+    owner: geth
+    group: geth
+    filetype: file
+    contains:
+    - NetworkId = 3
+    - SyncMode = "fast"
+    - LightServ = 90
+    - DatabaseCache = 1024
+    - ListenAddr = ":30303"
+  /usr/local/bin/geth-helper:
+    exists: true
+    mode:
+      or:
+      - "0755"
+      - "0775"
+    size:
+      gt: 1
+    owner: root
+    group: root
+    filetype: file
+    contains: []
+  /usr/local/bin/geth-wrap:
+    exists: true
+    mode:
+      or:
+      - "0755"
+      - "0775"
+    size:
+      gt: 1
+    owner: root
+    group: root
+    filetype: file
+    contains: []
+  /usr/local/bin/swarm-wrap:
+    exists: true
+    mode:
+      or:
+      - "0755"
+      - "0775"
+    size:
+      gt: 1
+    owner: root
+    group: root
+    filetype: file
+    contains: []
+  /usr/local/sbin/geth:
+    exists: true
+    mode: "0755"
+    size:
+      gt: 1
+    owner: root
+    group: root
+    filetype: file
+    contains: []
+package:
+  curl:
+    installed: true
+{{if eq .Env.TEST_COMMAND "geth"}}
+addr:
+  unix:///opt/geth/.ethereum/geth.ipc:
+    reachable: true
+    timeout: 500
+{{else if eq .Env.TEST_COMMAND "swarm"}}
+addr:
+  unix:///opt/geth/.ethereum/bzzd.ipc:
+    reachable: true
+    timeout: 500
+{{end}}
+
+{{if eq .Env.TEST_COMMAND "geth"}}
+port:
+  tcp6:30303:
+    listening: true
+    ip:
+    - '::'
+  udp6:30303:
+    listening: true
+    ip:
+    - '::'
+{{else if eq .Env.TEST_COMMAND "swarm"}}
+# port:
+#   tcp6:30303:
+#     listening: true
+#     ip:
+#     - '::'
+#   udp6:30303:
+#     listening: true
+#     ip:
+#     - '::'
+{{end}}
+user:
+  geth:
+    exists: true
+    uid: 999
+    gid: 999
+    groups:
+    - geth
+    home: /opt/geth
+    shell: /bin/false
+group:
+  geth:
+    exists: true
+    gid: 999
+{{if eq .Env.TEST_COMMAND "geth"}}
+process:
+  geth:
+    running: true
+{{else if eq .Env.TEST_COMMAND "swarm"}}
+process:
+  swarm:
+    running: true
+{{end}}

@@ -1,0 +1,11 @@
+{{if eq .Env.TEST_COMMAND "geth"}}
+addr:
+  unix:///opt/geth/.ethereum/geth.ipc:
+    reachable: true
+    timeout: 500
+{{else if eq .Env.TEST_COMMAND "swarm"}}
+# addr:
+#   unix:///opt/geth/.ethereum/swarm.ipc:
+#     reachable: true
+#     timeout: 500
+{{end}}

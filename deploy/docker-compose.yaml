@@ -1,0 +1,40 @@
+version: '2.2'
+services:
+  geth:
+    container_name: geth
+    network_mode: host
+    image: telephoneorg/geth:latest
+    environment:
+      NETWORK_ID: 3
+      GETH_VERBOSITY: 3
+      DEFAULT_ACCOUNT_PASS: NRg7fgqcQLoG8QjgRiajp6AqsUFAFL
+      GETH_CACHE: 2048
+      # GETH_MINE: 'true'
+    ports:
+    - "127.0.0.1:8545:8545"
+    - "127.0.0.1:8546:8546"
+    - "30303:30303"
+    - "30303:30303/udp"
+    - "30304:30304"
+    volumes:
+    - "/root/.ethereum:/root/.ethereum"
+    cpus: 12
+  swarm:
+    container_name: swarm
+    network_mode: host
+    image: telephoneorg/geth:latest
+    environment:
+      NETWORK_ID: 3
+      GETH_VERBOSITY: 3
+      SWARM_BZZ_ACCOUNT_PASS: NRg7fgqcQLoG8QjgRiajp6AqsUFAFL
+    ports:
+    - "8500:8500"
+    - "30399:30399"
+    - "30399:30399/udp"
+    volumes:
+    - "/root/.ethereum:/root/.ethereum"
+    command: swarm
+    depends_on:
+      geth:
+        condition: service_healthy
+    cpus: 4

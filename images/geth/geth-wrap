@@ -1,0 +1,109 @@
+#!/bin/bash -l
+
+set -e
+[[ $DEBUG == true ]] && set -x
+
+# : readonly ${GETH_CONFIG:=$HOME/.ethereum/.ethereum.toml}
+: readonly ${GETH_SYNC_MODE:=fast} # {fast,full,light}
+: readonly ${GETH_CACHE:=1024}     # (min 16MB / 512-2048 suggested (default: 128)
+
+# 0: silent  1: error  2: warn  3: info  4: core  5: debug  6: detail (default: 3)
+: readonly ${GETH_VERBOSITY:=3}
+: readonly ${GETH_WHISPER:=true}
+
+: readonly ${GETH_IPC_PATH:=$HOME/.ethereum/geth.ipc}
+: readonly ${GETH_RPC:=true}
+: readonly ${GETH_RPC_ADDR:=0.0.0.0}
+: readonly ${GETH_RPC_CORS:='*'}
+: readonly ${GETH_PORT:=30303}
+
+: readonly ${GETH_MINE:=false}
+
+: readonly ${GETH_LIGHT_SERV:=90}
+: readonly ${GETH_LIGHT_PEERS:=50}
+: readonly ${GETH_MAX_PEERS:=25}
+: readonly ${GETH_NO_DISCOVERY:=false}
+
+: readonly ${DEFAULT_ACCOUNT_PASS:=testtest}
+
+: ${SKIP_AUTO_CONFIG:=false}
+
+
+GETH_DATA_DIR=$HOME/.ethereum
+if [[ $NETWORK_ID == 3 ]]; then
+    GETH_DATA_DIR+=/testnet
+elif [[ $NETWORK_ID -gt 3 ]]; then
+    GETH_DATA_DIR+=/private-network-${NETWORK_ID}
+fi
+
+echo "
+
+GETH_CONFIG: $GETH_CONFIG
+
+"
+
+for file in .ethereum.toml; do
+    if [[ -e /config/$file ]]; then
+        ln -sf /config/$file $HOME/.ethereum/$file
+        SKIP_AUTO_CONFIG=true
+    fi
+done
+
+
+if [[ ! $SKIP_AUTO_CONFIG == true ]]; then
+    # to get a config file:
+    #   geth --your-favourite-flags dumpconfig
+    log::m-info "Writing config ..."
+    tee $GETH_CONFIG <<EOF
+[Eth]
+NetworkId = $NETWORK_ID
+SyncMode = "$GETH_SYNC_MODE"
+LightServ = $GETH_LIGHT_SERV
+LightPeers = $GETH_LIGHT_PEERS
+DatabaseCache = $GETH_CACHE
+
+[Shh]
+MaxMessageSize = 1048576
+MinimumAcceptedPOW = 2e-01
+
+[Node]
+DataDir = "$GETH_DATA_DIR"
+IPCPath = "$GETH_IPC_PATH"
+HTTPHost = "$GETH_RPC_ADDR"
+HTTPPort = 8545
+HTTPCors = ["$GETH_RPC_CORS"]
+HTTPModules = ["net", "web3", "eth", "shh"]
+WSHost = "$GETH_RPC_ADDR"
+WSPort = 8546
+WSOrigins = ["$GETH_RPC_CORS"]
+WSModules = ["net", "web3", "eth", "shh"]
+
+[Node.P2P]
+MaxPeers = 25
+NoDiscovery = false
+DiscoveryV5 = true
+DiscoveryV5Addr = ":30304"
+$(if [[ ! -z $BOOT_NODE ]]; then echo "BootstrapNodes = [\"$BOOT_NODE\"]"; fi)
+StaticNodes = []
+TrustedNodes = []
+ListenAddr = ":$GETH_PORT"
+EOF
+fi
+
+
+if [[ $(geth-helper number-of-accounts) == 0 ]]; then
+    log::m-info "No account, creating default account ..."
+    geth-helper create-default-account "$DEFAULT_ACCOUNT_PASS"
+fi
+
+
+log::m-info "Building arguments ..."
+args=(--verbosity $GETH_VERBOSITY "$@")
+set -- ${args[@]}
+
+
+log::m-info "Starting geth ..."
+# start a helper in the background that calls web3 to start mining
+[[ $GETH_MINE == true ]] && geth-helper start-mining &
+
+exec /usr/local/sbin/geth "$@"

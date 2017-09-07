@@ -1,0 +1,20 @@
+[Unit]
+Description=Go-ethereum client & swarm client
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ethereum
+ExecStartPre=-/usr/local/bin/docker-compose down
+ExecStartPre=-/usr/bin/docker pull telephoneorg/geth:latest
+ExecStart=/usr/local/bin/docker-compose up
+ExecStop=/usr/local/bin/docker-compose down
+
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=120
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

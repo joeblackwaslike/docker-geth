@@ -2,9 +2,10 @@ from invoke import task
 
 
 @task(default=True)
-def docker(ctx):
-    ctx.run('tests/run', pty=True)
+def run(ctx):
+    ctx.run('tests/run {}'.format(ctx.docker.service), pty=True)
+
 
 @task
-def local(ctx):
-    ctx.run('tests/run local', pty=True)
+def edit(ctx):
+    ctx.run('tests/edit {}'.format(ctx.docker.service), pty=True)

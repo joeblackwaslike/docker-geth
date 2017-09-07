@@ -8,17 +8,12 @@ def attach(ctx):
 
 @task
 def removedb(ctx):
-    ctx.run('echo "y\n" | docker-compose run --rm --no-deps geth geth removedb')
+    ctx.run('docker exec geth geth removedb')
 
 
 @task
 def start_mine(ctx):
-    ctx.run('docker-compose run -e "GETH_MINE=true" -d geth')
-
-
-@task
-def create_account(ctx):
-    ctx.run('docker-compose run --rm --no-deps geth geth account new')
+    ctx.run('docker-compose run -e "GETH_MINE=true" -d geth-wrap geth')
 
 
 @task

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 
 
 # ref: https://swarm-guide.readthedocs.io/en/latest/runninganode.html#adding-enodes-manually
@@ -7,6 +7,9 @@
 # then I've implemented an array of enode peers and select one from random at
 # startup, then add it as a peer using geth's IPC socket.
 #
+
+GETH=/usr/local/sbin/geth
+
 readonly SWARM_ENODE_PEERS=(
     enode://01f7728a1ba53fc263bcfbc2acacc07f08358657070e17536b2845d98d1741ec2af00718c79827dfdbecf5cfcd77965824421508cc9095f378eb2b2156eb79fa@40.68.194.101:30400
     enode://6d9102dd1bebb823944480282c4ba4f066f8dcf15da513268f148890ddea42d7d8afa58c76b08c16b867a58223f2b567178ac87dcfefbd68f0c3cc1990f1e3cf@40.68.194.101:30427
@@ -20,6 +23,18 @@ readonly SWARM_ENODE_PEERS=(
     enode://8bb7fb70b80f60962c8979b20905898f8f6172ae4f6a715b89712cb7e965bfaab9aa0abd74c7966ad688928604815078c5e9c978d6e57507f45173a03f95b5e0@40.68.194.101:30436
 )
 
+function _is-proc-running {
+    local cmd="${1?No process provided}"
+    ps -e -o comm | grep -v ps | grep -q "$cmd"
+}
+
+function is-swarm {
+    _is-proc-running swarm
+}
+
+function is-geth {
+    _is-proc-running geth
+}
 
 function get-swarm-enode {
     local index=$(expr $RANDOM % ${#SWARM_ENODE_PEERS[@]})
@@ -36,28 +51,51 @@ function _ensure-hex {
 }
 
 function geth-is-running {
-    nc -z 127.0.0.1 30303
+    local ipc_path="${GETH_IPC_PATH:-${SWARM_ENS_API:-$HOME/.ethereum/geth.ipc}}"
+    cat /proc/net/unix | grep -q $ipc_path
 }
 
 function swarm-is-running {
-    nc -z 127.0.0.1 30399
+    local ipc_path="${SWARM_IPC_PATH:-$HOME/.ethereum/bzzd.ipc}"
+    cat /proc/net/unix | grep -q $ipc_path
 }
 
 function node-is-healthy {
-    geth-is-running || swarm-is-running
+    if is-swarm; then
+        swarm-is-running
+    elif is-geth; then
+        geth-is-running
+    else
+        return 1
+    fi
 }
 
-function _wait-until-healthy {
+function get-main-proc {
+    if is-swarm; then
+        echo 'swarm'
+    elif is-geth; then
+        echo 'geth'
+    else
+        return 1
+    fi
+}
+
+function wait-until-ready {
+    local verbose="${1:-false}"
+    local proc=$(get-main-proc)
+    [[ $verbose == true ]] && printf "Waiting for $proc ipc ."
     until node-is-healthy; do
+        [[ $verbose == true ]] && printf '.'
         sleep 2
     done
+    [[ $verbose == true ]] && echo "\n"
 }
 
 function number-of-accounts {
     if geth-is-running; then
-        geth attach --exec "console.log(personal.listAccounts.length)" | head -1 | xargs
+        $GETH attach --exec "console.log(personal.listAccounts.length)" | head -1 | xargs
     else
-        geth account list 2> /dev/null | wc -l | xargs
+        $GETH account list 2> /dev/null | wc -l | xargs
     fi
 }
 
@@ -65,6 +103,7 @@ function unlock-account {
     local account="$1"
     local pass="$2"
     [[ -z $account || -z $pass ]] && exit 1
+    wait-until-ready
     geth attach --exec "personal.unlockAccount(\"$account\", \"$pass\")"
 }
 
@@ -72,10 +111,10 @@ function get-account-by-index {
     local index="${1:-0}"
     local account
     if geth-is-running; then
-        geth attach --exec "console.log(personal.listAccounts[$index])" | head -1 | xargs
+        $GETH attach --exec "console.log(personal.listAccounts[$index])" | head -1 | xargs
     else
         ((index++))
-        account=$(geth account list | sed -n "${index}p" | cut -d' ' -f3 | sed 's/{\|}//g')
+        account=$($GETH account list | sed -n "${index}p" | cut -d' ' -f3 | sed 's/{\|}//g')
         [[ -z $account ]] && return 1
         _ensure-hex $account
     fi
@@ -83,63 +122,95 @@ function get-account-by-index {
 
 function unlock-primary-account {
     local pass="${1}"
-    _wait-for-geth
+    wait-until-ready
     if [[ $(number-of-accounts) != 0 ]]; then
         primary_account=$(get-account-by-index 0)
         unlock-account "$primary_account" "$pass"
     fi
 }
 
+function attach {
+    if is-swarm; then
+        local ipc_path="ipc://${SWARM_IPC_PATH:-$HOME/.ethereum/bzzd.ipc}"
+    fi
+    $GETH attach "$ipc_path"
+}
+
 function rpc {
-    _wait-until-healthy
-    geth attach --exec "$@"
+    wait-until-ready
+    if is-swarm; then
+        local ipc_path="ipc://${SWARM_IPC_PATH:-$HOME/.ethereum/bzzd.ipc}"
+    fi
+    $GETH attach --exec "$@" "$ipc_path"
 }
 
 function start-mining {
     local miner_threads="${1:-$(nproc)}"
-    _wait-until-healthy
-    geth attach --exec "miner.start($miner_threads)"
+    wait-until-ready
+    $GETH attach --exec "miner.start($miner_threads)"
 }
 
 function get-property {
     local key="$1"
-    geth attach --exec "console.log($key)" | head -1 | xargs
+    wait-until-ready
+    output=$(rpc "console.log($key)" | head -n -1)
+    if [[ $(echo -e "$output" | wc -l) == 1 ]]; then
+        output=$(echo "$output" | xargs)
+    fi
+    echo -e "$output"
 }
 
 function stop-mining {
-    _wait-until-healthy
-    geth attach --exec "miner.stop()"
+    wait-until-ready
+    rpc 'miner.stop()'
+}
+
+function is-mining {
+    is-geth && [[ $(get-property 'eth.mining') == 'true' ]]
+}
+
+function is-syncing {
+    is-geth && [[ $(get-property 'eth.mining') != 'false' ]]
+}
+
+function get-hashrate {
+    is-geth && get-property 'eth.hashrate'
+}
+
+function get-peer-count {
+    get-property 'net.peerCount'
 }
 
 function add-peer {
     local enode="$1"
-    geth attach --exec="admin.addPeer(\"$enode\")"
+    wait-until-ready
+    # geth attach --exec="admin.addPeer(\"$enode\")"
+    rpc "admin.addPeer(\"$enode\")"
 }
 
 function bootstrap-swarm-enode {
     local enode="${SWARM_ENODE_PEER:=$(get-swarm-enode)}"
+    wait-until-ready
     [[ ! -z $DEBUG ]] && echo "Adding enode peer: $SWARM_ENODE_PEER"
     add-peer "$enode"
 }
 
-function bootstrap-swarm-enode-bg {
-    _wait-until-healthy
-    bootstrap-swarm-enode
-}
-
-function add-peer-bg {
-    _wait-until-healthy
-    add-peer "$1"
-}
-
 function create-default-account {
-    local pass="${1:-testtest}"
-    geth account new --password <(echo -n "$pass")
+    local pass="$1"
+    if [[ -z $pass ]]; then
+        pass=$(cat /dev/random | tr -dc _A-Z-a-z-0-9 | head -c32)
+        echo "Auto-generated password for new account: $pass"
+    fi
+    $GETH account new --password <(echo -n "$pass")
+}
+
+function show-bzz-hive {
+    is-swarm && rpc "console.log(bzz.hive)" | head -n -1
 }
 
 
 if [[ ! -z $1 ]]; then
     "$@"
 else
-    echo "Usage: $(basename $0) {rpc <console-command>|unlock-account|get-account-by-index|unlock-primary-account|start-mining|stop-mining}"
+    echo "Usage: $(basename $0) {rpc <console-command>|unlock-account|get-account-by-index|unlock-primary-account|start-mining|stop-mining|geth-is-running|swarm-is-running|}"
 fi

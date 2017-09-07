@@ -4,45 +4,45 @@ services:
     container_name: geth
     hostname: geth.local
     build:
-      context: .
+      context: images/geth
       args:
-        GOLANG_VERSION: 1.8.3
-        SOLC_VERSION: v0.4.13
-    image: telephoneorg/geth:${TAG:-latest}
-    env_file:
-    - default.env
-    - secrets.env
+        GETH_VERSION: 1.6.7
+        GETH_COMMIT: ab5646c5
+        GETH_MD5SUM: 2a070065c2b4e12d6fbe294fa868f0ed
+        SOLIDITY_VERSION: 0.4.16
+        SOLIDITY_MD5SUM: 92d0132ac24436010c22383b161b4c7d
+    image: ${DOCKER_ORG:-joeblackwaslike}/geth:latest
+    environment:
+      NETWORK_ID: '3'
+      GETH_VERBOSITY: '3'
+      TEST_COMMAND: geth
+      DEBUG: 'true'
     ports:
     - "8545:8545"
     - "8546:8546"
     - "30303:30303"
     - "30303:30303/udp"
-    - "30304:30304"
+    - "30304:30304/udp"
     volumes:
-    - "ethereum:/root/.ethereum"
-    networks:
-      local:
-        aliases:
-        - geth.local
+    - "ethereum:/opt/geth/.ethereum"
     restart: on-failure
   swarm:
     container_name: swarm
     hostname: swarm.local
-    image: telephoneorg/geth:${TAG:-latest}
-    env_file:
-    - default.env
-    - secrets.env
+    image: ${DOCKER_ORG:-joeblackwaslike}/geth:latest
+    environment:
+      NETWORK_ID: '3'
+      SWARM_VERBOSITY: '3'
+      SWARM_BZZ_ACCOUNT_PASS: testtest
+      DEBUG: 'true'
+      TEST_COMMAND: swarm
     ports:
     - "8500:8500"
     - "30399:30399"
     - "30399:30399/udp"
     volumes:
-    - "ethereum:/root/.ethereum"
-    command: swarm
-    networks:
-      local:
-        aliases:
-        - swarm.local
+    - "ethereum:/opt/geth/.ethereum"
+    command: swarm-wrap
     depends_on:
       geth:
         condition: service_healthy

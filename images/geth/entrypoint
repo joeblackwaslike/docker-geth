@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -e
+
+function chown-ethereum-home {
+    chown -R $USER:$USER ~/.ethereum
+}
+
+
+case "$1" in
+    geth-wrap)
+        chown-ethereum-home
+        exec gosu $USER geth-wrap "${@:2}"
+        ;;
+    bash)
+        exec "$@"
+        ;;
+    *)
+        chown-ethereum-home
+        exec gosu $USER "$@"
+        ;;
+esac

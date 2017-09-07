@@ -1,13 +1,9 @@
-#!/bin/bash
-
-: readonly ${GETH_CONFIG:=$HOME/.ethereum.toml}
-
+#!/bin/bash -l
 
 args=()
 [[ -a $GETH_CONFIG ]] && \
     args+=(--config $GETH_CONFIG)
 [[ $NETWORK_ID == 3 ]] && \
     args+=(--testnet)
-
 
 exec /usr/local/bin/geth ${args[@]} "$@"
