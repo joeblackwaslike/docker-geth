@@ -1,4 +1,11 @@
-command:
-  geth-helper geth-is-running:
-    exit-status: 0
-    timeout: 10000
+{{if eq .Env.TEST_COMMAND "geth"}}
+addr:
+  unix:///opt/geth/.ethereum/geth.ipc:
+    reachable: true
+    timeout: 500
+{{else if eq .Env.TEST_COMMAND "swarm"}}
+addr:
+  tcp://geth:8545:
+    reachable: true
+    timeout: 1000
+{{end}}

@@ -23,6 +23,40 @@ readonly SWARM_ENODE_PEERS=(
     enode://8bb7fb70b80f60962c8979b20905898f8f6172ae4f6a715b89712cb7e965bfaab9aa0abd74c7966ad688928604815078c5e9c978d6e57507f45173a03f95b5e0@40.68.194.101:30436
 )
 
+function get-geth-data-dir {
+    local data_dir=$HOME/.ethereum
+    case "$NETWORK_ID" in
+        1) data_dir+=/public ;;
+        2) data_dir+=/morden ;;
+        3) data_dir+=/testnet ;;
+        4) data_dir+=/rinkeby ;;
+        *) data_dir+=/private-${NETWORK_ID} ;;
+    esac
+    echo "$data_dir"
+}
+
+function write-genesis-json {
+    local geth_data_dir=$(get-geth-data-dir)
+    mkdir -p $geth_data_dir/config
+    echo -e '{
+        "config": {
+            "chainId": __CHAIN_ID__,
+            "homesteadBlock": 0,
+            "eip155Block": 0,
+            "eip158Block": 0
+        },
+        "difficulty": "20000",
+        "gasLimit": "2100000",
+        "alloc": {}
+    }
+}' | sed "s/__CHAIN_ID__/$NETWORK_ID/" > $geth_data_dir/config/genesis.json
+}
+
+function init-db {
+    local geth_data_dir=$(get-geth-data-dir)
+    $GETH init $geth_data_dir/config/genesis.json
+}
+
 function _is-proc-running {
     local cmd="${1?No process provided}"
     ps -e -o comm | grep -v ps | grep -q "$cmd"
@@ -184,7 +218,6 @@ function get-peer-count {
 function add-peer {
     local enode="$1"
     wait-until-ready
-    # geth attach --exec="admin.addPeer(\"$enode\")"
     rpc "admin.addPeer(\"$enode\")"
 }
 

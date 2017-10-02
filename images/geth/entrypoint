@@ -3,7 +3,7 @@
 set -e
 
 function chown-ethereum-home {
-    chown -R $USER:$USER ~/.ethereum
+    chown -R $USER:$USER ~/.ethereum ~/.ethash
 }
 
 

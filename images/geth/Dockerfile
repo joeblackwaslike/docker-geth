@@ -35,8 +35,9 @@ COPY    goss /goss
 COPY    geth /usr/local/sbin/
 COPY    geth-wrap /usr/local/bin/
 COPY    swarm-wrap /usr/local/bin/
+COPY    bootnode-wrap /usr/local/bin/
 
-VOLUME  ["$HOME/.ethereum"]
+VOLUME  ["$HOME/.ethereum", "$HOME/.ethash"]
 
 # NetworkID's) 1: Mainnet  2:Morden (disused)  3:Ropsten (testnet)
 ENV     GETH_NETWORK_ID 3
@@ -48,6 +49,9 @@ EXPOSE  8545 8546 30303 30303/udp 30304/udp
 
 # swarm
 EXPOSE  8500 30399 30399/udp
+
+# bootnode
+EXPOSE  30301 30301/udp
 
 ENTRYPOINT  ["/dumb-init", "--", "/entrypoint"]
 CMD         ["geth-wrap"]

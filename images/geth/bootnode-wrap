@@ -1,0 +1,49 @@
+#!/bin/bash -l
+
+set -e
+[[ $DEBUG == true ]] && set -x
+
+BOOTNODE_DATA_DIR=$HOME/.ethereum/bootnode
+
+[[ ! -z $BOOTNODE_ADDR ]] && : readonly ${BOOTNODE_ADDR:=$BOOTNODE_ADDR:30301}
+
+# 0: silent  1: error  2: warn  3: info  4: core  5: debug  6: detail (default: 3)
+: readonly ${BOOTNODE_VERBOSITY:=3}
+# port mapping mechanism (any|none|upnp|pmp|extip:<IP>) (default "none")
+: readonly ${BOOTNODE_NAT:=any}
+# restrict network communication to the given IP networks (CIDR masks)
+: readonly ${BOOTNODE_NET_RESTRICT:=}
+# run a v5 topic discovery bootnode set to false since 1.6 doesn't have proper v5 eth protocol support
+: readonly ${BOOTNODE_V5:=false}
+
+
+mkdir -p $BOOTNODE_DATA_DIR
+
+
+if [[ ! -a $BOOTNODE_DATA_DIR/boot.key ]]; then
+    echo "No bootnode key file, generating ..."
+    bootnode -verbosity $BOOTNODE_VERBOSITY -genkey $BOOTNODE_DATA_DIR/boot.key
+fi
+
+
+ENODE_HASH=$(bootnode -nodekey $BOOTNODE_DATA_DIR/boot.key -writeaddress)
+IP_ADDR=$(hostname -i)
+echo "Enode: enode://$ENODE_HASH@$IP_ADDR:30301"
+
+
+log::m-info "Building arguments ..."
+args=(
+    -verbosity $BOOTNODE_VERBOSITY
+    -nat $BOOTNODE_NAT
+    -nodekey $BOOTNODE_DATA_DIR/boot.key
+)
+[[ ! -z $BOOTNODE_ADDR ]] && \
+    args+=(-addr $BOOTNODE_ADDR)
+[[ ! -z $BOOOTNODE_NET_RESTRICT ]] && \
+    args+=(-netrestrict $BOOOTNODE_NET_RESTRICT)
+[[ $BOOTNODE_V5 == true  ]] && \
+    args+=(-v5 $BOOTNODE_V5)
+args+=("$@")
+set -- ${args[@]}
+
+exec bootnode "$@"

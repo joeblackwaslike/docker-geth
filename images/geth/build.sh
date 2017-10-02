@@ -10,7 +10,7 @@ build::user::create $USER
 
 log::m-info "Installing dependencies ..."
 apt-get update -qq
-apt-get install -yqq ca-certificates curl
+apt-get install -yqq ca-certificates curl jq
 
 
 log::m-info "Installing go-ethereum & tools ..."
@@ -19,7 +19,7 @@ gpg --recv-key A61A13569BA28146
 
 tmp_dir=$(mktemp -d)
 pushd $tmp_dir
-curl -sL -O $GETH_DOWNLOAD_URL && \
+curl -L -O $GETH_DOWNLOAD_URL && \
     gpg --no-tty --verify <(curl -s ${GETH_DOWNLOAD_URL}.asc) geth-alltools-*.tar.gz && \
     [[ $(md5sum geth-alltools-*.tar.gz | awk '{print $1}') == $GETH_MD5SUM ]] && \
     tar xzvf geth-alltools-*.tar.gz --strip-components=1 -C . && \

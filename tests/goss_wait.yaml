@@ -4,8 +4,11 @@ addr:
     reachable: true
     timeout: 500
 {{else if eq .Env.TEST_COMMAND "swarm"}}
-# addr:
-#   unix:///opt/geth/.ethereum/swarm.ipc:
-#     reachable: true
-#     timeout: 500
+addr:
+  tcp://geth:8545:
+    reachable: true
+    timeout: 1000
+  unix:///opt/geth/.ethereum/bzzd.ipc:
+    reachable: true
+    timeout: 1000
 {{end}}

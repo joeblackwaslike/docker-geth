@@ -1,53 +1,116 @@
-version: '2.1'
+version: '2.2'
 services:
   geth:
     container_name: geth
-    hostname: geth.local
     build:
       context: images/geth
       args:
-        GETH_VERSION: 1.6.7
-        GETH_COMMIT: ab5646c5
-        GETH_MD5SUM: 2a070065c2b4e12d6fbe294fa868f0ed
-        SOLIDITY_VERSION: 0.4.16
-        SOLIDITY_MD5SUM: 92d0132ac24436010c22383b161b4c7d
+        GETH_VERSION: 1.7.0
+        GETH_COMMIT: 6c6c7b2a
+        GETH_MD5SUM: 4f19032a835cdbdc0cca4086b788479a
+        SOLIDITY_VERSION: 0.4.17
+        SOLIDITY_MD5SUM: e80124f66673c82843ef0e4d829f5983
     image: ${DOCKER_ORG:-joeblackwaslike}/geth:latest
     environment:
-      NETWORK_ID: '3'
+      NETWORK_ID: '111771'
       GETH_VERBOSITY: '3'
+      GETH_DB_CACHE: '128'
       TEST_COMMAND: geth
-      DEBUG: 'true'
+      GETH_NAT: 'none'
+      # DEBUG: 'true'
+      GETH_RPC_MODULES: net,admin,personal,web3,eth,db,shh
+      GETH_NETRESTRICT_CIDR: 172.18.0.0/16
+      # BOOT_NODES: enode://9245a7bd22d89136c980c8f28bbdcdc79ea282e60b7b9e942bc8c0cfc7f33514fea963a3cfe69f8aa4bf9f35b456620ee77df98f5af91a704249e955c493608d@172.18.0.2:30301
+    networks:
+      local:
     ports:
     - "8545:8545"
     - "8546:8546"
-    - "30303:30303"
-    - "30303:30303/udp"
-    - "30304:30304/udp"
-    volumes:
-    - "ethereum:/opt/geth/.ethereum"
-    restart: on-failure
+    # - "30303:30303"
+    # - "30303:30303/udp"
+    # - "30304:30304/udp"
+    # volumes:
+    # - "$PWD/local/keystore:/opt/geth/.ethereum/private-111771/keystore"
+    # - "$PWD/local/genesis.json:/opt/geth/.ethereum/private-111771/config/genesis.json"
   swarm:
     container_name: swarm
-    hostname: swarm.local
     image: ${DOCKER_ORG:-joeblackwaslike}/geth:latest
     environment:
-      NETWORK_ID: '3'
+      NETWORK_ID: '111771'
       SWARM_VERBOSITY: '3'
-      SWARM_BZZ_ACCOUNT_PASS: testtest
+      # SWARM_BZZ_ACCOUNT_PASS: testtest
       DEBUG: 'true'
+      # SWARM_ENABLE_SWAP: 'true'
       TEST_COMMAND: swarm
     ports:
     - "8500:8500"
-    - "30399:30399"
-    - "30399:30399/udp"
-    volumes:
-    - "ethereum:/opt/geth/.ethereum"
+    # - "30399:30399"
+    # - "30399:30399/udp"
     command: swarm-wrap
+    # volumes:
+    # - "$PWD/local/keys/1:/opt/geth/.ethereum/private-111771/keystore"
+    networks:
+      local:
     depends_on:
       geth:
         condition: service_healthy
-    restart: on-failure
+  # swarm2:
+  #   container_name: swarm2
+  #   image: ${DOCKER_ORG:-joeblackwaslike}/geth:latest
+  #   environment:
+  #     NETWORK_ID: '111771'
+  #     SWARM_VERBOSITY: '3'
+  #     SWARM_ENABLE_SWAP: 'true'
+  #     # SWARM_BZZ_ACCOUNT_PASS: testtest
+  #     # DEBUG: 'true'
+  #     # TEST_COMMAND: swarm
+  #   # ports:
+  #   # - "8500:8500"
+  #   # - "30399:30399"
+  #   # - "30399:30399/udp"
+  #   command: swarm-wrap
+  #   # volumes:
+  #   # - "$PWD/local/keys/2:/opt/geth/.ethereum/private-111771/keystore"
+  #   networks:
+  #     local:
+    # depends_on:
+    #   geth:
+    #     condition: service_healthy
+  # bootnode:
+  #   container_name: bootnode
+  #   image: ${DOCKER_ORG:-joeblackwaslike}/geth:latest
+  #   command: bootnode-wrap
+  #   environment:
+  #     # DEBUG: 'true'
+  #     BOOTNODE_NAT: none
+  #     TEST_COMMAND: bootnode
+  #     BOOTNODE_VERBOSITY: '5'
+  #     BOOTNODE_NETRESTRICT_CIDR: 172.18.0.0/16
+  #   volumes:
+  #   - "$PWD/local/boot.key:/opt/geth/.ethereum/bootnode/boot.key"
+  #   # ports:
+  #   # - "30301:30301/udp"
+  #   networks:
+  #     local:
+  # miner:
+  #   container_name: miner
+  #   image: ${DOCKER_ORG:-joeblackwaslike}/geth:latest
+  #   environment:
+  #     NETWORK_ID: '111771'
+  #     GETH_VERBOSITY: '3'
+  #     GETH_SYNC_MODE: full
+  #     GETH_NAT: 'none'
+  #     # DEBUG: 'true'
+  #     GETH_NETRESTRICT_CIDR: 172.18.0.0/16
+  #     GETH_MINE: 'true'
+  #     GETH_MINER_THREADS: '1'
+  #     BOOT_NODES: enode://9245a7bd22d89136c980c8f28bbdcdc79ea282e60b7b9e942bc8c0cfc7f33514fea963a3cfe69f8aa4bf9f35b456620ee77df98f5af91a704249e955c493608d@172.18.0.2:30301
+  #   volumes:
+  #   - "$PWD/local/keystore:/opt/geth/.ethereum/private-111771/keystore"
+  #   - "$PWD/local/genesis.json:/opt/geth/.ethereum/private-111771/config/genesis.json"
+  #   networks:
+  #     local:
+  #   cpus: 0.5
+  #   mem_limit: 1gb
 networks:
   local:
-volumes:
-  ethereum:

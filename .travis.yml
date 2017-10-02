@@ -36,3 +36,4 @@ script: inv test
 after_success:
 - ci-tag-build
 - hub-push
+- hub-update-readme

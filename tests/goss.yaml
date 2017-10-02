@@ -20,7 +20,12 @@ file:
     filetype: file
   /goss:
     exists: true
-    mode: "0777"
+    mode:
+      or:
+      - "0755"
+      - "0777"
+    size:
+      gt: 1
     owner: root
     group: root
     filetype: directory
@@ -45,13 +50,13 @@ file:
     owner: root
     group: root
     filetype: file
-    contains: []
   /opt/geth/.ethereum:
     exists: true
     mode: "0755"
     owner: geth
     group: geth
     filetype: directory
+{{if eq .Env.TEST_COMMAND "geth"}}
   /opt/geth/.ethereum/.ethereum.toml:
     exists: true
     mode: "0644"
@@ -61,11 +66,23 @@ file:
     group: geth
     filetype: file
     contains:
-    - NetworkId = 3
+    - NetworkId
     - SyncMode = "fast"
-    - LightServ = 90
-    - DatabaseCache = 1024
+    - DatabaseCache
     - ListenAddr = ":30303"
+{{else if eq .Env.TEST_COMMAND "swarm"}}
+  /opt/geth/.ethereum/.ethereum.toml:
+    exists: true
+    mode: "0644"
+    size:
+      gt: 1
+    owner: geth
+    group: geth
+    filetype: file
+    contains:
+    - Node
+    - DataDir =
+{{end}}
   /usr/local/bin/geth-helper:
     exists: true
     mode:
@@ -77,7 +94,6 @@ file:
     owner: root
     group: root
     filetype: file
-    contains: []
   /usr/local/bin/geth-wrap:
     exists: true
     mode:
@@ -89,7 +105,6 @@ file:
     owner: root
     group: root
     filetype: file
-    contains: []
   /usr/local/bin/swarm-wrap:
     exists: true
     mode:
@@ -101,7 +116,6 @@ file:
     owner: root
     group: root
     filetype: file
-    contains: []
   /usr/local/sbin/geth:
     exists: true
     mode: "0755"
@@ -110,7 +124,6 @@ file:
     owner: root
     group: root
     filetype: file
-    contains: []
 package:
   curl:
     installed: true
@@ -123,7 +136,17 @@ addr:
 addr:
   unix:///opt/geth/.ethereum/bzzd.ipc:
     reachable: true
-    timeout: 500
+    timeout: 1000
+{{end}}
+
+{{if eq .Env.TEST_COMMAND "swarm"}}
+http:
+  http://localhost:8500:
+    status: 400
+    no-follow-redirects: false
+    timeout: 5000
+    body:
+    - "Swarm: Serverless Hosting Incentivised Peer-To-Peer Storage And Content Distribution"
 {{end}}
 
 {{if eq .Env.TEST_COMMAND "geth"}}
@@ -137,15 +160,11 @@ port:
     ip:
     - '::'
 {{else if eq .Env.TEST_COMMAND "swarm"}}
-# port:
-#   tcp6:30303:
-#     listening: true
-#     ip:
-#     - '::'
-#   udp6:30303:
-#     listening: true
-#     ip:
-#     - '::'
+port:
+  udp6:30399:
+    listening: true
+    ip:
+    - '::'
 {{end}}
 user:
   geth:

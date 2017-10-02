@@ -18,7 +18,7 @@ services:
     - "30304:30304"
     volumes:
     - "/root/.ethereum:/root/.ethereum"
-    cpus: 12
+    cpus: 4
   swarm:
     container_name: swarm
     network_mode: host
@@ -37,4 +37,4 @@ services:
     depends_on:
       geth:
         condition: service_healthy
-    cpus: 4
+    cpus: 2

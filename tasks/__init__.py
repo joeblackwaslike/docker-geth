@@ -23,7 +23,7 @@ ns.configure(dict(
             os.getenv('DOCKER_ORG',
             os.getenv('DOCKER_USER', 'joeblackwaslike')), 'couchdb'
         ),
-        service='geth',
+        services=['geth', "swarm"],
         shell='bash'
     ),
     kube=dict(

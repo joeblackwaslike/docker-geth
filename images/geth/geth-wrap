@@ -5,7 +5,7 @@ set -e
 
 # : readonly ${GETH_CONFIG:=$HOME/.ethereum/.ethereum.toml}
 : readonly ${GETH_SYNC_MODE:=fast} # {fast,full,light}
-: readonly ${GETH_CACHE:=1024}     # (min 16MB / 512-2048 suggested (default: 128)
+: readonly ${GETH_DB_CACHE:=1024}     # (min 16MB / 512-2048 suggested (default: 128)
 
 # 0: silent  1: error  2: warn  3: info  4: core  5: debug  6: detail (default: 3)
 : readonly ${GETH_VERBOSITY:=3}
@@ -15,32 +15,34 @@ set -e
 : readonly ${GETH_RPC:=true}
 : readonly ${GETH_RPC_ADDR:=0.0.0.0}
 : readonly ${GETH_RPC_CORS:='*'}
-: readonly ${GETH_PORT:=30303}
+# : readonly ${GETH_PORT:=30303}
 
 : readonly ${GETH_MINE:=false}
+: readonly ${GETH_MINER_THREADS:=$(nproc)}
 
-: readonly ${GETH_LIGHT_SERV:=90}
+# disabling LightServ instead of using 90 here because of geth bug
+# ref: https://github.com/ethereum/go-ethereum/issues/15079
+: readonly ${GETH_LIGHT_SERV:=false}
 : readonly ${GETH_LIGHT_PEERS:=50}
 : readonly ${GETH_MAX_PEERS:=25}
+: readonly ${GETH_NETRESTRICT_CIDR:=}
 : readonly ${GETH_NO_DISCOVERY:=false}
+# port mapping mechanism (any|none|upnp|pmp|extip:<IP>) (default "any")
+: readonly ${GETH_NAT:=any}
+
+: readonly ${GETH_RPC_MODULES:=net,web3,eth,shh}
 
 : readonly ${DEFAULT_ACCOUNT_PASS:=testtest}
 
+
 : ${SKIP_AUTO_CONFIG:=false}
 
+[[ ! -z $GETH_RPC_MODULES ]] && \
+    GETH_RPC_MODULES_JSON=$(jq -cnM --arg inarr "${GETH_RPC_MODULES//,/ }" '$inarr | split(" ")')
 
-GETH_DATA_DIR=$HOME/.ethereum
-if [[ $NETWORK_ID == 3 ]]; then
-    GETH_DATA_DIR+=/testnet
-elif [[ $NETWORK_ID -gt 3 ]]; then
-    GETH_DATA_DIR+=/private-network-${NETWORK_ID}
-fi
+GETH_DATA_DIR=$(geth-helper get-geth-data-dir)
+mkdir -p $GETH_DATA_DIR
 
-echo "
-
-GETH_CONFIG: $GETH_CONFIG
-
-"
 
 for file in .ethereum.toml; do
     if [[ -e /config/$file ]]; then
@@ -58,9 +60,11 @@ if [[ ! $SKIP_AUTO_CONFIG == true ]]; then
 [Eth]
 NetworkId = $NETWORK_ID
 SyncMode = "$GETH_SYNC_MODE"
-LightServ = $GETH_LIGHT_SERV
-LightPeers = $GETH_LIGHT_PEERS
-DatabaseCache = $GETH_CACHE
+$(if [[ ! $GETH_LIGHT_SERV == false ]]; then
+    echo -e "LightServ = $GETH_LIGHT_SERV
+LightPeers = $GETH_LIGHT_PEERS"
+fi)
+DatabaseCache = $GETH_DB_CACHE
 
 [Shh]
 MaxMessageSize = 1048576
@@ -72,22 +76,47 @@ IPCPath = "$GETH_IPC_PATH"
 HTTPHost = "$GETH_RPC_ADDR"
 HTTPPort = 8545
 HTTPCors = ["$GETH_RPC_CORS"]
-HTTPModules = ["net", "web3", "eth", "shh"]
+HTTPModules = $GETH_RPC_MODULES_JSON
 WSHost = "$GETH_RPC_ADDR"
 WSPort = 8546
 WSOrigins = ["$GETH_RPC_CORS"]
-WSModules = ["net", "web3", "eth", "shh"]
+WSModules = $GETH_RPC_MODULES_JSON
 
 [Node.P2P]
 MaxPeers = 25
-NoDiscovery = false
 DiscoveryV5 = true
 DiscoveryV5Addr = ":30304"
-$(if [[ ! -z $BOOT_NODE ]]; then echo "BootstrapNodes = [\"$BOOT_NODE\"]"; fi)
+NoDiscovery = $GETH_NO_DISCOVERY
 StaticNodes = []
 TrustedNodes = []
-ListenAddr = ":$GETH_PORT"
+ListenAddr = ":30303"
 EOF
+fi
+
+# $(if [[ ! $GETH_LIGHT_SERV == false ]]; then echo "LightPeers = $GETH_LIGHT_PEERS"; fi)
+# [Node.P2P]
+# DiscoveryV5 = true
+# DiscoveryV5Addr = ":30304"
+# $(if [[ ! -z $BOOT_NODES ]]; then
+#     echo BootstrapNodes = $(jq -cnM --arg inarr "${BOOT_NODES//,/ }" '$inarr | split(" ")')
+# fi)
+# $(if [[ ! -z $BOOT_NODESv5 ]]; then
+#     echo BootstrapNodesV5 = $(jq -cnM --arg inarr "${BOOT_NODESv5//,/ }" '$inarr | split(" ")')
+# else
+#     echo "BootstrapNodesV5 = []"
+# fi)
+
+if [[ $NETWORK_ID -gt 4 ]]; then
+    if [[ ! -a $GETH_DATA_DIR/config/genesis.json ]]; then
+        echo "Private network, generating genesis block ..."
+        geth-helper write-genesis-json
+        cat $GETH_DATA_DIR/config/genesis.json
+    fi
+
+    if [[ ! -d $GETH_DATA_DIR/geth/chaindata ]]; then
+        echo "No blockchain db, Initializing db ..."
+        geth-helper init-db
+    fi
 fi
 
 
@@ -99,11 +128,18 @@ fi
 
 log::m-info "Building arguments ..."
 args=(--verbosity $GETH_VERBOSITY "$@")
+[[ ! -z $GETH_NETRESTRICT_CIDR ]] && \
+    args+=(--netrestrict $GETH_NETRESTRICT_CIDR)
+[[ ! -z $BOOT_NODES ]] && \
+    args+=(--bootnodes="$BOOT_NODES")
+[[ ! -z $GETH_NAT && ! $GETH_NAT == 'any' ]] && \
+    args+=(--nat $GETH_NAT)
+
 set -- ${args[@]}
 
 
 log::m-info "Starting geth ..."
 # start a helper in the background that calls web3 to start mining
-[[ $GETH_MINE == true ]] && geth-helper start-mining &
+[[ $GETH_MINE == true ]] && geth-helper start-mining $GETH_MINER_THREADS &
 
 exec /usr/local/sbin/geth "$@"

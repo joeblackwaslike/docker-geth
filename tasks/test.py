@@ -3,7 +3,9 @@ from invoke import task
 
 @task(default=True)
 def run(ctx):
-    ctx.run('tests/run {}'.format(ctx.docker.service), pty=True)
+    for service in ctx.docker.services:
+        print('testing {}'.format(service))
+        ctx.run('tests/run {}'.format(service), pty=True)
 
 
 @task

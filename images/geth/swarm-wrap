@@ -3,45 +3,74 @@
 set -e
 [[ $DEBUG == true ]] && set -x
 
-: readonly ${SWARM_PORT:=30399}
-: readonly ${SWARM_HTTP_ADDR:=0.0.0.0}
-: readonly ${SWARM_HTTP_PORT:=8500}
-
 : readonly ${SWARM_IPC_PATH:=$HOME/.ethereum/bzzd.ipc}
-: readonly ${SWARM_ENS_API:=$HOME/.ethereum/geth.ipc}
 : readonly ${SWARM_CORS:=\'*\'}
+: readonly ${ETH_API_URL:=ws://geth:8546}
+
+if [[ -a $HOME/.ethereum/geth.ipc ]]; then
+    : readonly ${SWARM_ENS_API:=$HOME/.ethereum/geth.ipc}
+else
+    : readonly ${SWARM_ENS_API:=$ETH_API_URL}
+fi
 
 # 0: silent  1: error  2: warn  3: info4: core  5: debug  6: detail (default: 3)
 : readonly ${SWARM_VERBOSITY:=3}
 : readonly ${SWARM_BZZ_ACCOUNT_PASS:=testtest}
+: readonly ${SWARM_NETRESTRICT_CIDR:=}
+: readonly ${SWARM_NO_DISCOVERY:=false}
+# port mapping mechanism (any|none|upnp|pmp|extip:<IP>) (default "any")
+: readonly ${SWARM_NAT:=any}
+: readonly ${SWARM_NETRESTRICT_CIDR:=}
+: readonly ${SWARM_V5_DISC:=false}
+
+: readonly ${SWARM_ENABLE_SWAP:=false}
 : readonly ${SWARM_WAIT_FOR_GETH:=true}
 
 
-SWARM_DATA_DIR=$HOME/.ethereum
-if [[ $NETWORK_ID == 3 ]]; then
-    SWARM_DATA_DIR+=/testnet
-elif [[ $NETWORK_ID -gt 3 ]]; then
-    GETH_DATA_DIR+=/private-network-${NETWORK_ID}
-fi
+SWARM_DATA_DIR=$(geth-helper get-geth-data-dir)
+mkdir -p $SWARM_DATA_DIR
+
+# needed for geth-wrapper (used by geth-helper) to find the correct data directory
+tee $GETH_CONFIG <<EOF
+[Node]
+DataDir = "$SWARM_DATA_DIR"
+EOF
 
 
-if [[ -z $SWARM_BZZ_ACCOUNT && $(geth-helper number-of-accounts) -gt 0 ]]; then
-    readonly SWARM_BZZ_ACCOUNT=$(geth-helper get-account-by-index 0)
+# if [[ $(geth-helper number-of-accounts) == 0 ]]; then
+#     log::m-info "No account, creating default account ..."
+#     geth-helper create-default-account "$DEFAULT_ACCOUNT_PASS"
+# fi
+
+if [[ -z $SWARM_BZZ_ACCOUNT && $(geth-helper number-of-accounts) == 0 ]]; then
+    log::m-info "No account, creating default account ..."
+    geth-helper create-default-account "$SWARM_BZZ_ACCOUNT_PASS"
 fi
+
+readonly SWARM_BZZ_ACCOUNT=$(geth-helper get-account-by-index 0)
 
 
 log::m-info "Building arguments ..."
-args=()
+args=(--httpaddr 0.0.0.0)
+args+=(--bzznetworkid $NETWORK_ID)
 args+=(--bzzaccount $SWARM_BZZ_ACCOUNT)
 args+=(--datadir $SWARM_DATA_DIR)
 args+=(--ipcpath $SWARM_IPC_PATH)
 args+=(--ens-api $SWARM_ENS_API)
-args+=(--port $SWARM_PORT)
-args+=(--httpaddr $SWARM_HTTP_ADDR)
-args+=(--bzzport $SWARM_HTTP_PORT)
 args+=(--verbosity $SWARM_VERBOSITY)
 args+=(--corsdomain $SWARM_CORS)
+[[ ! -z $SWARM_NETRESTRICT_CIDR ]] && \
+    args+=(--netrestrict $SWARM_NETRESTRICT_CIDR)
+[[ ! -z $BOOT_NODES ]] && \
+    args+=(--bootnodes "$BOOT_NODES")
+[[ ! -z $SWARM_NAT && ! $SWARM_NAT == 'any' ]] && \
+    args+=(--nat $SWARM_NAT)
+[[ $SWARM_ENABLE_SWAP == true ]] && \
+    args+=(--swap --swap-api $ETH_API_URL)
+[[ $SWARM_V5_DISC == true ]] && \
+    args+=(--v5disc)
 args+=("$@")
+
 set -- ${args[@]}
 
 
